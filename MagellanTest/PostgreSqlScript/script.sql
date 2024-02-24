@@ -27,10 +27,13 @@ VALUES ('Item1', NULL, 500, '2024-02-20'),
 CREATE FUNCTION Get_Total_Cost(item_name_input VARCHAR(50))
 RETURNS INT AS $$ 
 DECLARE 
-    total_cost INT; 
+    total_cost INT;
+    parent_item_id INT;
 BEGIN 
-    IF (SELECT parent_item FROM item WHERE item_name = item_name_input) IS NULL THEN
-         WITH RECURSIVE my_func(id, item_name, parent_item, cost) AS (
+    SELECT parent_item INTO parent_item_id FROM item WHERE item_name = item_name_input;
+
+    IF parent_item_id IS NULL THEN -- Check if parent_item_id is NULL
+        WITH RECURSIVE my_recursive_cte(id, item_name, parent_item, cost) AS (
             SELECT id, item_name, parent_item, cost 
             FROM item 
             WHERE item_name = item_name_input
@@ -39,14 +42,18 @@ BEGIN
             
             SELECT i.id, i.item_name, i.parent_item, i.cost 
             FROM item i
-            JOIN my_func mf ON i.parent_item = mf.id
+            JOIN my_recursive_cte r ON i.parent_item = r.id
         )
-        SELECT SUM(cost) INTO total_cost FROM my_func; 
+        SELECT SUM(cost) INTO total_cost FROM my_recursive_cte; 
         RETURN total_cost;
     ELSE 
-        RETURN total_cost;
+        RETURN total_cost;  -- Return null if parent_item_id is not NULL
     END IF;
 END; 
 $$ LANGUAGE plpgsql;
 
-SELECT Get_Total_Cost('Sub2');
+-- Returns 1700
+SELECT Get_Total_Cost('Item1');
+
+-- Returns NULL
+SELECT Get_Total_Cost('Sub1');
